@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Tracker</title>
+  <style>
+    :root { --ink:#17203a; --muted:#69738f; --purple:#6554c0; --purple-dark:#51409d; --line:#e7e9f2; --bg:#f7f8fc; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font-family:Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--ink); background:linear-gradient(135deg,#f7f8fc 0%,#f2effa 100%); }
+    .shell { max-width:980px; margin:0 auto; padding:48px 24px; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom:28px; }
+    .brand { display:flex; align-items:center; gap:12px; }
+    .brand-mark { width:42px; height:42px; display:grid; place-items:center; border-radius:12px; background:var(--purple); color:white; font-size:22px; box-shadow:0 8px 18px rgba(101,84,192,.24); }
+    h1 { margin:0; font-size:25px; letter-spacing:-.02em; }
+    .date { color:var(--muted); font-size:14px; }
+    .panel { background:white; border:1px solid rgba(231,233,242,.9); border-radius:18px; box-shadow:0 16px 40px rgba(55,62,104,.08); overflow:hidden; }
+    .composer { display:grid; grid-template-columns:1fr 170px auto; gap:12px; padding:20px; border-bottom:1px solid var(--line); }
+    input { width:100%; border:1px solid var(--line); border-radius:10px; padding:12px 14px; font:inherit; color:var(--ink); background:#fbfbfd; outline:none; }
+    input:focus { border-color:#9e94db; box-shadow:0 0 0 3px rgba(101,84,192,.1); }
+    button { border:0; border-radius:10px; font-weight:700; cursor:pointer; font-family:inherit; }
+    .add { padding:12px 18px; background:var(--purple); color:white; }
+    .add:hover { background:var(--purple-dark); }
+    .summary { display:grid; grid-template-columns:repeat(3,1fr); border-bottom:1px solid var(--line); }
+    .stat { padding:18px 20px; border-right:1px solid var(--line); }
+    .stat:last-child { border-right:0; }
+    .stat-label { color:var(--muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; }
+    .stat-value { margin-top:4px; font-size:24px; font-weight:800; }
+    .task-head { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 8px; }
+    .task-head h2 { margin:0; font-size:16px; }
+    .filter { display:flex; gap:6px; }
+    .filter button { padding:7px 10px; background:transparent; color:var(--muted); }
+    .filter button.active { background:#efedfb; color:var(--purple); }
+    .tasks { list-style:none; margin:0; padding:8px 20px 16px; }
+    .task { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; min-height:64px; border-bottom:1px solid var(--line); }
+    .task:last-child { border-bottom:0; }
+    .check { width:21px; height:21px; border:2px solid #b7bdd0; border-radius:6px; background:white; display:grid; place-items:center; color:white; padding:0; }
+    .task.completed .check { border-color:#56a68b; background:#56a68b; }
+    .task.completed .check::after { content:"✓"; font-size:13px; }
+    .task.completed .task-title { text-decoration:line-through; color:#98a0b3; }
+    .task-title { font-weight:650; }
+    .due { color:var(--muted); font-size:13px; margin-top:3px; }
+    .empty { text-align:center; color:var(--muted); padding:42px 20px; }
+    .error { margin:12px 20px 0; padding:10px 12px; border-radius:8px; background:#fff4f4; color:#a33b3b; font-size:13px; }
+    @media (max-width:680px) { .shell { padding:24px 14px; } header { align-items:flex-start; } .date { display:none; } .composer { grid-template-columns:1fr; } .summary { grid-template-columns:1fr; } .stat { border-right:0; border-bottom:1px solid var(--line); } .stat:last-child { border-bottom:0; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="brand"><div class="brand-mark">✓</div><h1>Task Tracker</h1></div>
+      <div class="date" id="today"></div>
+    </header>
+    <section class="panel">
+      <form class="composer" id="taskForm">
+        <input id="title" name="title" maxlength="100" placeholder="What needs to get done?" required>
+        <input id="dueDate" name="dueDate" type="date" required>
+        <button class="add" type="submit">Add task</button>
+      </form>
+      <div id="error" class="error" hidden></div>
+      <div class="summary">
+        <div class="stat"><div class="stat-label">Total</div><div class="stat-value" id="total">0</div></div>
+        <div class="stat"><div class="stat-label">To do</div><div class="stat-value" id="todo">0</div></div>
+        <div class="stat"><div class="stat-label">Completed</div><div class="stat-value" id="completed">0</div></div>
+      </div>
+      <div class="task-head"><h2>My tasks</h2><div class="filter"><button class="active" data-filter="all">All</button><button data-filter="open">Open</button><button data-filter="done">Done</button></div></div>
+      <ul class="tasks" id="tasks"></ul>
+    </section>
+  </main>
+<script>
+  const sampleTasks = [
+    { task_id: 1, title: 'Finish INFO 430 schema', due_date: '2026-11-25', is_completed: false },
+    { task_id: 2, title: 'Read chapter 6', due_date: '2026-11-26', is_completed: true },
+    { task_id: 3, title: 'Submit database lab', due_date: '2026-11-28', is_completed: false }
+  ];
+  let tasks = [];
+  let filter = 'all';
+
+  document.getElementById('today').textContent = new Intl.DateTimeFormat('en-US', { weekday:'long', month:'short', day:'numeric' }).format(new Date());
+  const dueInput = document.getElementById('dueDate');
+  dueInput.value = new Date().toISOString().slice(0, 10);
+
+  function formatDate(value) {
+    if (!value) return 'No due date';
+    return 'Due ' + new Intl.DateTimeFormat('en-US', { month:'short', day:'numeric', year:'numeric' }).format(new Date(value.slice(0,10) + 'T12:00:00'));
+  }
+
+  function render() {
+    const shown = tasks.filter(task => filter === 'all' || (filter === 'open' && !task.is_completed) || (filter === 'done' && task.is_completed));
+    document.getElementById('total').textContent = tasks.length;
+    document.getElementById('todo').textContent = tasks.filter(task => !task.is_completed).length;
+    document.getElementById('completed').textContent = tasks.filter(task => task.is_completed).length;
+    const list = document.getElementById('tasks');
+    if (!shown.length) { list.innerHTML = '<li class="empty">No tasks here yet.</li>'; return; }
+    list.innerHTML = shown.map(task => `<li class="task ${task.is_completed ? 'completed' : ''}"><button class="check" aria-label="Mark ${task.is_completed ? 'incomplete' : 'complete'}" data-id="${task.task_id}"></button><div><div class="task-title"></div><div class="due"></div></div></li>`).join('');
+    [...list.querySelectorAll('.task')].forEach((element, index) => {
+      const task = shown[index];
+      element.querySelector('.task-title').textContent = task.title;
+      element.querySelector('.due').textContent = formatDate(task.due_date);
+    });
+  }
+
+  function showError(message) { const box = document.getElementById('error'); box.textContent = message; box.hidden = false; }
+
+  async function loadTasks() {
+    try {
+      const response = await fetch('/api/tasks');
+      if (!response.ok) throw new Error('Could not load tasks');
+      tasks = await response.json();
+      document.getElementById('error').hidden = true;
+    } catch (error) {
+      tasks = sampleTasks.map(task => ({...task}));
+      showError('Sample data is shown because the database is not connected yet.');
+    }
+    render();
+  }
+
+  document.getElementById('taskForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const title = document.getElementById('title').value.trim();
+    const dueDate = dueInput.value;
+    if (!title || !dueDate) return;
+    try {
+      const response = await fetch('/api/tasks', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ title, dueDate }) });
+      if (!response.ok) throw new Error('Could not add task');
+      document.getElementById('taskForm').reset();
+      dueInput.value = new Date().toISOString().slice(0,10);
+      await loadTasks();
+    } catch (error) {
+      tasks.push({ task_id: Date.now(), title, due_date: dueDate, is_completed:false });
+      render();
+      document.getElementById('taskForm').reset();
+      dueInput.value = new Date().toISOString().slice(0,10);
+    }
+  });
+
+  document.getElementById('tasks').addEventListener('click', async event => {
+    const button = event.target.closest('.check');
+    if (!button) return;
+    const id = Number(button.dataset.id);
+    const task = tasks.find(item => item.task_id === id);
+    if (!task) return;
+    const completed = !task.is_completed;
+    try {
+      const response = await fetch(`/api/tasks/${id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ completed }) });
+      if (!response.ok) throw new Error('Could not update task');
+      await loadTasks();
+    } catch (error) { task.is_completed = completed; render(); }
+  });
+
+  document.querySelectorAll('.filter button').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('.filter button').forEach(item => item.classList.remove('active'));
+    button.classList.add('active');
+    filter = button.dataset.filter;
+    render();
+  }));
+
+  loadTasks();
+</script>
+</body>
+</html>
